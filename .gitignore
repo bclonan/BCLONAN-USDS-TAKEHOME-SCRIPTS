@@ -1,0 +1,15 @@
+__pycache__/
+.pytest_cache/
+.venv/
+env/
+venv/
+*.pyc
+*.pyo
+*.pyd
+*.log
+ecfr_scraper.log
+checksums.json
+data/
+dist/
+build/
+*.egg-info/

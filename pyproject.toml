@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ecfr-scraper"
+version = "0.1.0"
+description = "Download and parse eCFR XML with metadata and checksums"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "BCLONAN" }]
+license = { text = "Proprietary" }
+dependencies = [
+  "requests>=2.31.0",
+  "tqdm>=4.66.0",
+]
+
+[project.scripts]
+ecfr-scraper = "ecfr_scraper.cli:main"
+
+[tool.setuptools]
+packages = ["ecfr_scraper"]
