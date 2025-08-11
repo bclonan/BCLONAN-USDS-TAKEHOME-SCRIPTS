@@ -1,106 +1,232 @@
 # ECFR Scraper
 
-Download, parse, and analyze eCFR XML from govinfo.gov with checksum verification, progress tracking, and metadata extraction.
+High‑level utility to download, parse, analyze, and optionally publish eCFR (Electronic Code of Federal Regulations) XML titles (1–50) from `govinfo.gov`. Provides checksum-based caching, parallel downloads, structured JSON export, lexical statistics, per-file metadata, pluggable storage backends (local folder or S3), manifest generation, and notebooks for exploration.
 
-- Package: `ecfr_scraper` (importable and runnable via `python -m ecfr_scraper`)
-- Console script: `ecfr-scraper` (installed via this package)
-- Key modules:
-  - `ecfr_scraper.scraper` — main scraper and parser (`ECFRScraper`)
-  - `ecfr_scraper.metadata` — multi-format metadata extraction (`MetadataExtractor`)
-  - `ecfr_scraper.utils` — checksums, logging, persistence
-  - `ecfr_scraper.cli` — CLI entrypoint
-
-## Features
-
-- Download eCFR title XMLs (Titles 1–50) with caching via checksums
-- Parallel downloads with progress bar
-- XML parsing into structured JSON + lexical stats
-- Per-file metadata JSON (XML, ZIP, TXT; PDF placeholder)
-- Persistent checksum DB for change detection
-- Logging to console and file
-
-## Requirements
-
-- Python 3.9+
-- Dependencies installed automatically when packaging; or use requirements.txt
-
-Quick install of deps (without packaging):
+## Quick Start
 
 ```powershell
-pip install -r requirements.txt
+pip install -r requirements.txt          # install core deps
+python -m ecfr_scraper --title 1 --output .\data --verbose
 ```
 
-## Usage
-
-You can run the tool as a module or via the console script.
-
-- Show help:
+Generate a manifest and stage artifacts into a folder (e.g. for static hosting):
 
 ```powershell
-python -m ecfr_scraper -h
+python -m ecfr_scraper --title 1 --output .\data \
+  --upload --storage-backend folder --storage-bucket staged --manifest manifest.json --verbose
 ```
 
-- Download and parse a single title:
+## Feature Highlights
+
+- Title XML download with checksum skip (idempotent re-runs)
+- Parallel multi-title fetch (`--all`, `--workers N`)
+- XML → structured JSON (parts, sections, stats)
+- Lexical analysis: word & sentence counts, top words
+- Per-artifact metadata sidecar (`*.metadata.json`)
+- Pluggable storage: noop (default), local folder staging, Amazon S3
+- Optional upload of artifacts (`--upload`) + manifest generation
+- Logging (console + rotating log file) & progress bars (tqdm)
+
+## CLI Reference
+
+Run `python -m ecfr_scraper -h` or `ecfr-scraper --help` after install.
+
+Core options:
+
+- `--title N`                Download & process a single title
+- `--all`                    Download & process all titles (1–50)
+- `--output PATH`            Local output directory (default `./data`)
+- `--workers INT`            Parallel download threads (default 5)
+- `--metadata-only`          Skip XML parsing / JSON export (metadata only)
+- `--verbose`                Verbose logging
+
+Storage / publication:
+
+- `--storage-backend {folder,s3}`  Select backend (omit for noop)
+- `--storage-bucket VALUE`         Folder path (folder) or bucket name (s3)
+- `--storage-prefix PREFIX`        Subdirectory/object key prefix (default `ecfr`)
+- `--no-public`                    For S3: disable public-read ACL
+- `--upload`                       After download, upload each XML (and derived JSON/metadata when processed)
+- `--manifest FILE`                Write manifest JSON mapping titles to artifact paths
+
+Examples:
 
 ```powershell
-python -m ecfr_scraper --title 21 --output .\data --verbose
+# All titles, parallel, produce manifest locally (no upload)
+python -m ecfr_scraper --all --workers 8 --manifest manifest.json
+
+# Single title, folder staging
+python -m ecfr_scraper --title 10 --upload --storage-backend folder --storage-bucket staged --manifest manifest.json
+
+# Single title, S3 (requires boto3 + credentials configured)
+pip install boto3
+python -m ecfr_scraper --title 5 --upload --storage-backend s3 --storage-bucket my-bucket --storage-prefix ecfr --manifest manifest.json
 ```
 
-- Download all titles in parallel (5 workers default, 8 shown):
+## Programmatic API
 
-```powershell
-python -m ecfr_scraper --all --workers 8 --output .\data
+```python
+from ecfr_scraper.scraper import ECFRScraper
+from ecfr_scraper.storage import build_storage
+
+storage = build_storage('folder', bucket='staged', prefix='ecfr')  # or 's3'
+scraper = ECFRScraper(output_dir='data', storage=storage)
+
+xml_path = scraper.download_title_xml(1, upload=True)
+data = scraper.parse_xml(xml_path)
+scraper.export_to_json(data, xml_path.replace('.xml', '.json'))
 ```
 
-- Generate only metadata (skip XML parsing/JSON export):
+Key methods:
 
-```powershell
-python -m ecfr_scraper --title 12 --metadata-only
+- `download_title_xml(title, output_dir=None, upload=False)`
+- `download_all_titles(output_dir=None, max_workers=5, upload=False)`
+- `parse_xml(path)` → structured dict
+- `export_to_json(data, path)`
+- `process_downloaded_files(file_paths)` batch parse + export
+
+## Output Artifacts
+
+For each title `N`:
+
+- Raw XML: `data/titleN.xml`
+- Parsed JSON: `data/titleN.json`
+- Metadata: `data/titleN.xml.metadata.json`
+- (Optional) Staged copy or S3 object if `--upload` used
+
+Global:
+
+- `checksums.json` — Persistent SHA‑256 map for incremental updates
+- `ecfr_scraper.log` — Log file
+- `manifest.json` (optional) — Summary of artifact locations
+
+### Manifest Format
+
+Example (folder backend):
+
+```json
+{
+  "title1": {
+    "xml": "data/title1.xml",
+    "json": "data/title1.json",
+    "metadata": "data/title1.xml.metadata.json"
+  }
+}
 ```
 
-After installing the package (editable/development mode):
+If S3 + public, values can be HTTPS URLs; otherwise `s3://bucket/key` style.
+
+## Architecture Overview
+
+```text
+          +--------------------+
+          |  CLI (argparse)    |
+          +----------+---------+
+                     |
+                     v
+        +------------+-------------+
+        |  ECFRScraper (core)      |
+        |  - download_title_xml    |
+        |  - download_all_titles   |
+        |  - parse_xml             |
+        +------------+-------------+
+                     |
+        +------------+-------------+
+        |  MetadataExtractor       |
+        +------------+-------------+
+                     |
+        +------------+-------------+
+        |  Storage Backend         |
+        | (Noop | Folder | S3)     |
+        +------------+-------------+
+                     |
+        +------------+-------------+
+        |  Outputs / Manifest      |
+        +--------------------------+
+```
+
+### Components & Responsibilities
+
+- `ECFRScraper` — Orchestrates download, checksum validation, parsing, lexical analysis, storage upload hooks.
+- `MetadataExtractor` — File-level metadata (size, mtime, hash, format heuristics) with pluggable extractors per extension.
+- `utils` — Logging setup, checksum helpers, load/save checksum DB.
+- `storage` — Strategy abstraction (`StorageBackend` protocol) with `NoopStorage`, `FolderStorage`, `S3Storage` + factory `build_storage`.
+- `cli` — User-facing argument parsing, high-level workflow (download, process, upload, manifest assembly).
+- Notebooks (`notebooks/`) — Guided usage (CLI, API, metadata, utilities, tutorial).
+
+### Data Flow
+
+1. CLI parses arguments → constructs storage backend + `ECFRScraper`.
+2. For each title: check checksum; skip or download.
+3. On fresh download: write XML, compute & persist checksum; extract metadata sidecar.
+4. If parsing enabled: parse XML → structured dict → JSON export + lexical stats.
+5. If `--upload`: each new artifact passed to storage backend.
+6. Manifest (if requested) accumulates artifact references.
+
+### Key Design Decisions
+
+- **Checksum Cache**: Avoid redundant network / parsing to speed iterative runs.
+- **Pluggable Storage**: Decouple publication from acquisition; enables local staging vs. cloud buckets without altering scraper logic.
+- **Threaded Downloads**: Simple `ThreadPoolExecutor` suffices (I/O bound); avoids heavier async complexity.
+- **Sidecar Metadata**: Keeps original XML untouched while enabling quick file introspection & reproducibility metadata.
+- **Manifest Emission**: Provides machine-readable index for downstream pipelines (e.g. static site, indexing, search ingestion).
+
+### Extension Points
+
+- Add new storage: implement `upload(local_path, remote_path=None)` and wire into `build_storage`.
+- Add richer parsing (citations, cross-references) inside `parse_xml`.
+- Enhance metadata: extend `MetadataExtractor.extract_*` methods.
+- Introduce retries/backoff or rate limiting in download logic.
+- Add testing: unit tests for parsing, checksum skipping, storage strategies.
+
+## Notebooks
+
+Located in `notebooks/`:
+
+- Tutorial (end-to-end)
+- CLI Usage
+- API Usage
+- Metadata Utilities
+- Utils (checksums & logging)
+
+Open in VS Code or Jupyter Lab to experiment.
+
+## Development & Contributing
+
+Editable install:
 
 ```powershell
 pip install -e .
-# Then
-ecfr-scraper --help
 ```
-
-## Outputs
-
-For each downloaded title N:
-
-- XML: .\data\titleN.xml
-- Parsed JSON: .\data\titleN.json
-- File metadata: .\data\titleN.xml.metadata.json
-- Global checksums: .\checksums.json
-- Logs: .\ecfr_scraper.log
-
-## How it works
-
-- Downloads from <https://www.govinfo.gov/bulkdata/ECFR/title-N/ECFR-titleN.xml>
-- Skips downloads if checksum matches in checksums.json
-- Parses XML to extract parts, sections, and text stats
-- Writes parsed JSON and file metadata alongside the XML
-
-## Development
-
-- Code lives under the `ecfr_scraper/` package.
-- Extend metadata extraction by adding a transformer method to `MetadataExtractor`.
-- Improve parsing by adjusting XPaths in `ECFRScraper.parse_xml`.
-
-Run a quick smoke test:
+Run a smoke test:
 
 ```powershell
 python -m ecfr_scraper --title 1 --output .\data --metadata-only --verbose
 ```
+Format / lint (add your preferred tools; none enforced yet).
+
 
 ## Troubleshooting
 
-- Force re-download: delete `checksums.json` and rerun.
-- Networking errors: check `ecfr_scraper.log` for HTTP status and details.
-- Invalid XML: verify remote availability; try another title.
+- Stale data? Delete `checksums.json` to force re-download.
+- Missing S3 support? Install boto3: `pip install boto3`.
+- Access denied on S3? Confirm AWS credentials & bucket policy.
+- Large runs slow? Increase `--workers`, or restrict to needed titles.
+- Manifest empty? Ensure you supplied `--manifest file.json` and processed at least one title.
 
-## License
+## Roadmap (Ideas)
 
-This repository currently does not specify a license.
+- GCS / Azure storage backends
+- Incremental diff export (changed sections only)
+- Structured citation graph
+- Search index builder (Whoosh / OpenSearch) from manifest
+- Optional SQLite catalog of parsed sections
+
+## Utilizing this repository 
+
+You can use the data downloaded and parsed by the ECFR Scraper in various ways, such as:
+
+- Analyzing the JSON output for specific regulatory text or metadata.
+- Integrating the data into other applications or workflows.
+- Using the metadata for compliance tracking or reporting.
+- Visualizing the data for insights or presentations.

@@ -1,0 +1,7 @@
+{
+  "title1": {
+    "xml": "test_out\\title1.xml",
+    "json": "test_out\\title1.json",
+    "metadata": "test_out\\title1.xml.metadata.json"
+  }
+}

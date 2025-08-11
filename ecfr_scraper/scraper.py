@@ -4,6 +4,7 @@ import json
 import logging
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
+from typing import Optional, List
 
 import requests
 import xml.etree.ElementTree as ET
@@ -11,19 +12,32 @@ from tqdm import tqdm
 
 from .metadata import MetadataExtractor
 from .utils import calculate_checksum, load_checksum_db, save_checksum_db
+from .storage import StorageBackend, NoopStorage
 
 logger = logging.getLogger(__name__)
 
 
 class ECFRScraper:
-    """Enhanced scraper for ECFR data with support for various file types and metadata extraction"""
+    """Enhanced scraper for ECFR data with optional storage backend.
 
-    def __init__(self, base_url: str = "https://www.govinfo.gov/bulkdata/ECFR", output_dir: str = "./data"):
+    Parameters:
+        base_url: Base URL for ECFR bulk data.
+        output_dir: Local directory for downloaded artifacts.
+        storage: Optional StorageBackend used when upload=True.
+    """
+
+    def __init__(
+        self,
+        base_url: str = "https://www.govinfo.gov/bulkdata/ECFR",
+        output_dir: str = "./data",
+        storage: Optional[StorageBackend] = None,
+    ):
         self.base_url = base_url
         self.output_dir = output_dir
         self.session = requests.Session()
         self.checksum_db = load_checksum_db()
         self.metadata_extractor = MetadataExtractor()
+        self.storage: StorageBackend = storage or NoopStorage()
         os.makedirs(output_dir, exist_ok=True)
 
     def get_resource_file(self, resource_name: str):
@@ -62,7 +76,7 @@ class ECFRScraper:
     def get_available_titles(self):
         return list(range(1, 51))
 
-    def download_title_xml(self, title_number: int, output_dir: str | None = None):
+    def download_title_xml(self, title_number: int, output_dir: Optional[str] = None, upload: bool = False):
         if output_dir is None:
             output_dir = self.output_dir
 
@@ -97,6 +111,8 @@ class ECFRScraper:
                     json.dump(metadata, f, indent=2)
 
                 logger.info(f"Downloaded and saved: {output_path}")
+                if upload:
+                    self._try_upload(output_path)
                 return output_path
             except requests.RequestException as e:
                 logger.warning(
@@ -183,16 +199,24 @@ class ECFRScraper:
             logger.error(f"Error exporting to JSON: {e}")
             return False
 
-    def download_all_titles(self, output_dir: str | None = None, max_workers: int = 5):
+    def download_all_titles(
+        self,
+        output_dir: Optional[str] = None,
+        max_workers: int = 5,
+        upload: bool = False,
+    ) -> List[str]:
         if output_dir is None:
             output_dir = self.output_dir
 
         titles = self.get_available_titles()
-        downloaded_files: list[str] = []
-        failed_titles: list[int] = []
+        downloaded_files: List[str] = []
+        failed_titles: List[int] = []
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(self.download_title_xml, title, output_dir): title for title in titles}
+            futures = {
+                executor.submit(self.download_title_xml, title, output_dir, upload): title
+                for title in titles
+            }
 
             with tqdm(total=len(futures), desc="Downloading Titles") as progress_bar:
                 for future in futures:
@@ -216,6 +240,13 @@ class ECFRScraper:
             logger.warning(f"Failed to download {len(failed_titles)} titles: {failed_titles}")
 
         return downloaded_files
+
+    def _try_upload(self, file_path: str) -> None:
+        try:
+            remote = self.storage.upload(file_path)
+            logger.info(f"Uploaded {file_path} -> {remote}")
+        except Exception as e:
+            logger.warning(f"Upload failed for {file_path}: {e}")
 
     def process_downloaded_files(self, files):
         results = []

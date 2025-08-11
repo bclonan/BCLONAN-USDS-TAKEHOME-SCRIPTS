@@ -9,7 +9,6 @@ venv/
 *.log
 ecfr_scraper.log
 checksums.json
-data/
 dist/
 build/
 *.egg-info/
