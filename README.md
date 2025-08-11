@@ -1,6 +1,6 @@
 # ECFR Scraper
 
-High‑level utility to download, parse, analyze, and optionally publish eCFR (Electronic Code of Federal Regulations) XML titles (1–50) from `govinfo.gov`. Provides checksum-based caching, parallel downloads, structured JSON export, lexical statistics, per-file metadata, pluggable storage backends (local folder or S3), manifest generation, and notebooks for exploration.
+High‑level utility to download, parse, and analyze eCFR (Electronic Code of Federal Regulations) XML titles (1–50) from `govinfo.gov`. Provides checksum-based caching, parallel downloads, structured JSON export, lexical statistics, per-file metadata, and notebooks for exploration. (Former upload/storage features removed.)
 
 ## Quick Start
 
@@ -9,12 +9,7 @@ pip install -r requirements.txt          # install core deps
 python -m ecfr_scraper --title 1 --output .\data --verbose
 ```
 
-Generate a manifest and stage artifacts into a folder (e.g. for static hosting):
-
-```powershell
-python -m ecfr_scraper --title 1 --output .\data \
-  --upload --storage-backend folder --storage-bucket staged --manifest manifest.json --verbose
-```
+> NOTE: Earlier versions supported upload & manifest generation; that functionality has been deprecated.
 
 ## Feature Highlights
 
@@ -23,8 +18,7 @@ python -m ecfr_scraper --title 1 --output .\data \
 - XML → structured JSON (parts, sections, stats)
 - Lexical analysis: word & sentence counts, top words
 - Per-artifact metadata sidecar (`*.metadata.json`)
-- Pluggable storage: noop (default), local folder staging, Amazon S3
-- Optional upload of artifacts (`--upload`) + manifest generation
+<!-- Storage/manifest features removed -->
 - Logging (console + rotating log file) & progress bars (tqdm)
 
 ## CLI Reference
@@ -166,10 +160,9 @@ If S3 + public, values can be HTTPS URLs; otherwise `s3://bucket/key` style.
 ### Key Design Decisions
 
 - **Checksum Cache**: Avoid redundant network / parsing to speed iterative runs.
-- **Pluggable Storage**: Decouple publication from acquisition; enables local staging vs. cloud buckets without altering scraper logic.
 - **Threaded Downloads**: Simple `ThreadPoolExecutor` suffices (I/O bound); avoids heavier async complexity.
 - **Sidecar Metadata**: Keeps original XML untouched while enabling quick file introspection & reproducibility metadata.
-- **Manifest Emission**: Provides machine-readable index for downstream pipelines (e.g. static site, indexing, search ingestion).
+- **Scope Simplification**: Removed prior storage/upload features to keep focus on reliable acquisition & parsing.
 
 ### Extension Points
 
@@ -209,20 +202,15 @@ Format / lint (add your preferred tools; none enforced yet).
 ## Troubleshooting
 
 - Stale data? Delete `checksums.json` to force re-download.
-- Missing S3 support? Install boto3: `pip install boto3`.
-- Access denied on S3? Confirm AWS credentials & bucket policy.
 - Large runs slow? Increase `--workers`, or restrict to needed titles.
-- Manifest empty? Ensure you supplied `--manifest file.json` and processed at least one title.
 
 ## Roadmap (Ideas)
 
-- GCS / Azure storage backends
 - Incremental diff export (changed sections only)
 - Structured citation graph
-- Search index builder (Whoosh / OpenSearch) from manifest
 - Optional SQLite catalog of parsed sections
 
-## Utilizing this repository 
+## Utilizing this repository
 
 You can use the data downloaded and parsed by the ECFR Scraper in various ways, such as:
 
