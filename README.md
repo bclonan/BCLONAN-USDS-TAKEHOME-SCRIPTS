@@ -95,12 +95,24 @@ Run a quick smoke test:
 python -m ecfr_scraper --title 1 --output .\data --metadata-only --verbose
 ```
 
+If the document is unchanged 
+
+```
+(base) PS C:\Users\bradl\OneDrive\Documents\GitHub\BCLONAN-USDS-TAKEHOME-SCRIPTS> python -m ecfr_scraper --title 1 --output .\data --metadata-only --verbose
+2025-08-11 17:52:07,802 - INFO - ecfr_scraper.scraper - Title 1 unchanged. Skipping download.
+```
+
 ## Troubleshooting
 
 - Force re-download: delete `checksums.json` and rerun.
 - Networking errors: check `ecfr_scraper.log` for HTTP status and details.
 - Invalid XML: verify remote availability; try another title.
 
-## License
+## Utilizing the data from the repository 
 
-This repository currently does not specify a license.
+You can use the data downloaded and parsed by the ECFR Scraper in various ways, such as:
+
+- Analyzing the JSON output for specific regulatory text or metadata.
+- Integrating the data into other applications or workflows.
+- Using the metadata for compliance tracking or reporting.
+- Visualizing the data for insights or presentations.
