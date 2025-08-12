@@ -1,0 +1,296 @@
+[
+  {
+    "file": ".\\data\\title1.xml",
+    "json": ".\\data\\title1.json",
+    "metadata": ".\\data\\title1.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title4.xml",
+    "json": ".\\data\\title4.json",
+    "metadata": ".\\data\\title4.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title3.xml",
+    "json": ".\\data\\title3.json",
+    "metadata": ".\\data\\title3.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title6.xml",
+    "json": ".\\data\\title6.json",
+    "metadata": ".\\data\\title6.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title11.xml",
+    "json": ".\\data\\title11.json",
+    "metadata": ".\\data\\title11.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title2.xml",
+    "json": ".\\data\\title2.json",
+    "metadata": ".\\data\\title2.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title8.xml",
+    "json": ".\\data\\title8.json",
+    "metadata": ".\\data\\title8.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title13.xml",
+    "json": ".\\data\\title13.json",
+    "metadata": ".\\data\\title13.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title9.xml",
+    "json": ".\\data\\title9.json",
+    "metadata": ".\\data\\title9.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title5.xml",
+    "json": ".\\data\\title5.json",
+    "metadata": ".\\data\\title5.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title16.xml",
+    "json": ".\\data\\title16.json",
+    "metadata": ".\\data\\title16.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title18.xml",
+    "json": ".\\data\\title18.json",
+    "metadata": ".\\data\\title18.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title15.xml",
+    "json": ".\\data\\title15.json",
+    "metadata": ".\\data\\title15.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title14.xml",
+    "json": ".\\data\\title14.json",
+    "metadata": ".\\data\\title14.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title10.xml",
+    "json": ".\\data\\title10.json",
+    "metadata": ".\\data\\title10.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title19.xml",
+    "json": ".\\data\\title19.json",
+    "metadata": ".\\data\\title19.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title17.xml",
+    "json": ".\\data\\title17.json",
+    "metadata": ".\\data\\title17.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title23.xml",
+    "json": ".\\data\\title23.json",
+    "metadata": ".\\data\\title23.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title22.xml",
+    "json": ".\\data\\title22.json",
+    "metadata": ".\\data\\title22.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title25.xml",
+    "json": ".\\data\\title25.json",
+    "metadata": ".\\data\\title25.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title20.xml",
+    "json": ".\\data\\title20.json",
+    "metadata": ".\\data\\title20.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title27.xml",
+    "json": ".\\data\\title27.json",
+    "metadata": ".\\data\\title27.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title24.xml",
+    "json": ".\\data\\title24.json",
+    "metadata": ".\\data\\title24.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title28.xml",
+    "json": ".\\data\\title28.json",
+    "metadata": ".\\data\\title28.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title21.xml",
+    "json": ".\\data\\title21.json",
+    "metadata": ".\\data\\title21.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title12.xml",
+    "json": ".\\data\\title12.json",
+    "metadata": ".\\data\\title12.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title7.xml",
+    "json": ".\\data\\title7.json",
+    "metadata": ".\\data\\title7.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title30.xml",
+    "json": ".\\data\\title30.json",
+    "metadata": ".\\data\\title30.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title31.xml",
+    "json": ".\\data\\title31.json",
+    "metadata": ".\\data\\title31.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title34.xml",
+    "json": ".\\data\\title34.json",
+    "metadata": ".\\data\\title34.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title37.xml",
+    "json": ".\\data\\title37.json",
+    "metadata": ".\\data\\title37.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title36.xml",
+    "json": ".\\data\\title36.json",
+    "metadata": ".\\data\\title36.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title33.xml",
+    "json": ".\\data\\title33.json",
+    "metadata": ".\\data\\title33.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title32.xml",
+    "json": ".\\data\\title32.json",
+    "metadata": ".\\data\\title32.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title39.xml",
+    "json": ".\\data\\title39.json",
+    "metadata": ".\\data\\title39.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title41.xml",
+    "json": ".\\data\\title41.json",
+    "metadata": ".\\data\\title41.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title38.xml",
+    "json": ".\\data\\title38.json",
+    "metadata": ".\\data\\title38.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title44.xml",
+    "json": ".\\data\\title44.json",
+    "metadata": ".\\data\\title44.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title43.xml",
+    "json": ".\\data\\title43.json",
+    "metadata": ".\\data\\title43.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title29.xml",
+    "json": ".\\data\\title29.json",
+    "metadata": ".\\data\\title29.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title42.xml",
+    "json": ".\\data\\title42.json",
+    "metadata": ".\\data\\title42.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title45.xml",
+    "json": ".\\data\\title45.json",
+    "metadata": ".\\data\\title45.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title46.xml",
+    "json": ".\\data\\title46.json",
+    "metadata": ".\\data\\title46.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title47.xml",
+    "json": ".\\data\\title47.json",
+    "metadata": ".\\data\\title47.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title48.xml",
+    "json": ".\\data\\title48.json",
+    "metadata": ".\\data\\title48.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title49.xml",
+    "json": ".\\data\\title49.json",
+    "metadata": ".\\data\\title49.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title50.xml",
+    "json": ".\\data\\title50.json",
+    "metadata": ".\\data\\title50.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title26.xml",
+    "json": ".\\data\\title26.json",
+    "metadata": ".\\data\\title26.xml.metadata.json",
+    "success": true
+  },
+  {
+    "file": ".\\data\\title40.xml",
+    "json": ".\\data\\title40.json",
+    "metadata": ".\\data\\title40.xml.metadata.json",
+    "success": true
+  }
+]

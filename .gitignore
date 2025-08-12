@@ -12,3 +12,8 @@ checksums.json
 dist/
 build/
 *.egg-info/
+# Data handling: ignore raw XML, keep minified + compressed + manifest
+data/title*.xml
+!data/title*.min.xml
+!data/title*.xml.gz
+!data/manifest.json

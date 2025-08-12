@@ -1,0 +1,96 @@
+{
+  "root_tag": "DLPSTEXTCLASS",
+  "namespaces": {},
+  "child_elements": [
+    "HEADER",
+    "TEXT"
+  ],
+  "element_count": 18996,
+  "word_stats": {
+    "word_count": 348222,
+    "unique_word_count": 7885,
+    "top_words": [
+      [
+        "the",
+        21404
+      ],
+      [
+        "of",
+        12922
+      ],
+      [
+        "and",
+        9102
+      ],
+      [
+        "a",
+        8908
+      ],
+      [
+        "to",
+        8379
+      ],
+      [
+        "or",
+        7801
+      ],
+      [
+        "in",
+        7259
+      ],
+      [
+        "for",
+        5187
+      ],
+      [
+        "federal",
+        3851
+      ],
+      [
+        "that",
+        3304
+      ],
+      [
+        "this",
+        3240
+      ],
+      [
+        "as",
+        2859
+      ],
+      [
+        "2",
+        2785
+      ],
+      [
+        "is",
+        2691
+      ],
+      [
+        "must",
+        2622
+      ],
+      [
+        "s",
+        2593
+      ],
+      [
+        "part",
+        2542
+      ],
+      [
+        "award",
+        2418
+      ],
+      [
+        "by",
+        2302
+      ],
+      [
+        "with",
+        2140
+      ]
+    ],
+    "avg_word_length": 5.065420909649592
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "root_tag": "DLPSTEXTCLASS",
+  "namespaces": {},
+  "child_elements": [
+    "HEADER",
+    "TEXT"
+  ],
+  "element_count": 9219,
+  "word_stats": {
+    "word_count": 251003,
+    "unique_word_count": 5428,
+    "top_words": [
+      [
+        "the",
+        17150
+      ],
+      [
+        "of",
+        10039
+      ],
+      [
+        "or",
+        7540
+      ],
+      [
+        "a",
+        7311
+      ],
+      [
+        "to",
+        6134
+      ],
+      [
+        "and",
+        5185
+      ],
+      [
+        "in",
+        4217
+      ],
+      [
+        "for",
+        3306
+      ],
+      [
+        "committee",
+        2510
+      ],
+      [
+        "by",
+        2494
+      ],
+      [
+        "that",
+        2328
+      ],
+      [
+        "candidate",
+        2323
+      ],
+      [
+        "shall",
+        2273
+      ],
+      [
+        "be",
+        2273
+      ],
+      [
+        "s",
+        2206
+      ],
+      [
+        "11",
+        2091
+      ],
+      [
+        "cfr",
+        2049
+      ],
+      [
+        "is",
+        1916
+      ],
+      [
+        "any",
+        1875
+      ],
+      [
+        "commission",
+        1833
+      ]
+    ],
+    "avg_word_length": 4.938506711075166
+  }
+}

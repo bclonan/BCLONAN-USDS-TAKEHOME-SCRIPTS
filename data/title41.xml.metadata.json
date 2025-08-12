@@ -1,0 +1,96 @@
+{
+  "root_tag": "DLPSTEXTCLASS",
+  "namespaces": {},
+  "child_elements": [
+    "HEADER",
+    "TEXT"
+  ],
+  "element_count": 39878,
+  "word_stats": {
+    "word_count": 766021,
+    "unique_word_count": 14140,
+    "top_words": [
+      [
+        "the",
+        47489
+      ],
+      [
+        "of",
+        28958
+      ],
+      [
+        "to",
+        19794
+      ],
+      [
+        "and",
+        18864
+      ],
+      [
+        "or",
+        17107
+      ],
+      [
+        "a",
+        16123
+      ],
+      [
+        "in",
+        11819
+      ],
+      [
+        "for",
+        11413
+      ],
+      [
+        "be",
+        6954
+      ],
+      [
+        "is",
+        6630
+      ],
+      [
+        "by",
+        6563
+      ],
+      [
+        "agency",
+        5762
+      ],
+      [
+        "that",
+        5489
+      ],
+      [
+        "as",
+        5221
+      ],
+      [
+        "s",
+        4772
+      ],
+      [
+        "with",
+        4663
+      ],
+      [
+        "an",
+        4521
+      ],
+      [
+        "may",
+        4326
+      ],
+      [
+        "this",
+        4295
+      ],
+      [
+        "property",
+        4212
+      ]
+    ],
+    "avg_word_length": 5.031711924346721
+  }
+}

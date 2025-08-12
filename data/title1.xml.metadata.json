@@ -1,0 +1,96 @@
+{
+  "root_tag": "DLPSTEXTCLASS",
+  "namespaces": {},
+  "child_elements": [
+    "HEADER",
+    "TEXT"
+  ],
+  "element_count": 3201,
+  "word_stats": {
+    "word_count": 69432,
+    "unique_word_count": 3795,
+    "top_words": [
+      [
+        "the",
+        5625
+      ],
+      [
+        "of",
+        3026
+      ],
+      [
+        "to",
+        1991
+      ],
+      [
+        "a",
+        1859
+      ],
+      [
+        "and",
+        1488
+      ],
+      [
+        "or",
+        1478
+      ],
+      [
+        "in",
+        1188
+      ],
+      [
+        "for",
+        952
+      ],
+      [
+        "be",
+        827
+      ],
+      [
+        "agency",
+        739
+      ],
+      [
+        "that",
+        715
+      ],
+      [
+        "shall",
+        713
+      ],
+      [
+        "by",
+        677
+      ],
+      [
+        "is",
+        577
+      ],
+      [
+        "request",
+        536
+      ],
+      [
+        "an",
+        500
+      ],
+      [
+        "as",
+        493
+      ],
+      [
+        "records",
+        437
+      ],
+      [
+        "s",
+        432
+      ],
+      [
+        "will",
+        426
+      ]
+    ],
+    "avg_word_length": 4.97642297499712
+  }
+}
