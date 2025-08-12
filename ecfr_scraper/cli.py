@@ -33,7 +33,7 @@ def build_parser() -> argparse.ArgumentParser:
         "Comma-separated pipeline steps to run (use --list-steps to see all)."
         ),
     )
-    parser.add_argument("--list-steps", action="store_true", help="List available pipeline step names and exit")
+    parser.add_argument("--list-steps", action="store_true", help="List available pipeline step names and exit (including enrich, ftsindex, embed, apiserve, manifest)")
     return parser
 
 

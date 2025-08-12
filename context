@@ -1,0 +1,76 @@
+Add the following : 
+
+#codebase can you work this into the app eCFR analysis rules ↔ data ↔ API ↔ questions
+#	Metric / Rule (key)	What it measures (why it matters)	Data to parse & save (from XML)	API that exposes it	Examples of questions it answers
+1	Word Count (wc)	Size/scope proxy per part/agency	node_text.word_count per SECTION → roll up	/api/parts, /api/parts/{t}/{p}	Which parts are longest? Which agencies have the largest regulatory footprint?
+2	Checksum (chash)	Change detection; any text change since last ingest	node_text.hash_sha256 per SECTION; part roll-up hash	/api/changes (and detail)	What changed most recently? Did Part 25 text change since last week?
+3	Restriction Density (rrd)	Prescriptiveness (binding terms per 1k words)	Count `shall	must	may not
+4	Conditional Complexity (cci)	Branching/exception complexity	Count `if	unless	except
+5	Enforcement/Remedy Intensity (eri)	Compliance risk language	Count `penalty	sanction	civil
+6	Discretion vs Obligation Ratio (dor)	Agency latitude vs mandates	Discretion hits `may	…discretion…` ÷ restriction hits	detail counts.dor
+7	Procedural Burden Index (pbi)	Operational overhead on recipients	Count `submit	report	certify
+8	Ambiguity Marker Rate (amr)	Potential vagueness/interpretation risk	Count `as appropriate	as necessary	reasonable
+9	Fiscal Leverage Index (fli)	Compliance tied to funding	Count `award term	SAM.gov	UEI
+10	Regulatory Age Profile (rap)	Staleness (yrs since amend)	AMDDATE → age in years (avg per part)	/api/parts (rap_years), detail	Which parts are oldest and likely outdated?
+11	Historical Volatility (hvi)	Churn/instability	Variance of section ages within part (from AMDDATE)	detail	Which parts change frequently and need stabilization?
+12	Reserved Surface Ratio (rsr)	Dead surface / cleanup opportunities	% of sections with [RESERVED]	detail	Where are big reserved gaps to prune or repurpose?
+13	Cross-Ref Centrality (crnc)	Interdependence/entanglement	reference table in-degree to a part (CFR refs)	detail (refs_in/refs_out as proxy)	Which parts are “linchpins” many others cite?
+14	Duplication & Reuse (drs)	Redundant text ripe for consolidation	Paragraph hashes/minhash across parts → % duplicated	detail	Which parts repeat language found elsewhere?
+15	Semantic Obligation Intensity (soi) (original)	Who is obligated, not just how often — weights obligation terms near actors (“recipient”, “subrecipient”, “agency”, “contractor”) within ±8 tokens. Helps target rules that place heavy, direct obligations on external parties (vs. internal agency procedures).	Token window scans around each restriction hit; actor lexicons; store per-section weighted hits → avg per part.	detail counts.soi (add to API); can appear in /api/parts if you add a column	Which parts most intensely obligate recipients/subrecipients? Where are obligations mostly internal to the agency?
+16	Readability (fk_grade)	Comprehension burden	Flesch-Kincaid grade	detail counts.fk_grade	Which parts are hardest to read and could be simplified?
+
+Implementation notes for the original metric (SOI)
+Actor terms (expandable lists):
+
+External: recipient, subrecipient, applicant, contractor, awardee, grantee
+
+Internal: agency, secretary, department, administrator, director
+
+Scoring (per section, then averaged per part):
+
+For every restriction term match (from RRD), search ±8 tokens.
+
+If an external actor is found → +1.0
+
+If an internal actor is found → +0.5 (still an obligation, but likely inward-facing)
+
+If both, prefer external (count +1.0 once).
+
+Normalize to per-1,000 words like other densities.
+
+Why it helps: distinguishes parts that actually bind the public/recipients (prime targets for burden reduction, simplification, or clearer guidance) from parts that mostly set internal agency procedures.
+
+You can wire SOI with ~20 lines next to primitive_signals():
+
+add two regexes for external_actor and internal_actor
+
+when counting restriction hits, scan a token window to see if an actor occurs; tally weighted hits
+
+expose as soi in per-part rollup and show in the detail “Top Drivers” list
+
+Minimal API surface (recap)
+GET /api/parts → sortable overview: dos, rrd, cci, eri, rap_years, drs (+ add soi if you like)
+
+GET /api/parts/{title}/{part} → summary, top_drivers, full counts (include soi), refs_in, refs_out
+
+GET /api/search/refs?q= → reference mining
+
+GET /api/changes → change feed via checksums & amend dates
+
+Quick mapping cheat-sheet (XML → data fields)
+Hierarchy: DIV5@N = part number; DIV8@TYPE="SECTION" = sections; HEAD = headings
+
+Dates: nearest AMDDATE upwards (fallback global one under ECFRBRWS)
+
+Provenance: SOURCE (FR cites), AUTH (USC/Pub.L/EO bases)
+
+Content: join all <P> under a section; normalize & hash
+
+References: scan text_norm for CFR/USC patterns; store raw + normalized target
+
+Flags: [RESERVED] in HEAD/first paragraph; “Definitions” in HEAD
+
+
+
+here are your instructions : 
+

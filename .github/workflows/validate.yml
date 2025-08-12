@@ -20,6 +20,7 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install lxml
+          pip install .[dev]
       - name: Run scraper download (changed only path via diff step later)
         run: |
           python -m ecfr_scraper --all --chain download --output data
@@ -49,3 +50,6 @@ jobs:
         with:
           name: validation-report
           path: validation_report.json
+      - name: Run tests
+        run: |
+          pytest -q

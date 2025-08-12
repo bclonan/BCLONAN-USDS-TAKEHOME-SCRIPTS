@@ -162,16 +162,34 @@ class ECFRScraper:
                 "parts": [],
                 "stats": {"total_sections": 0, "word_count": 0, "paragraph_count": 0},
             }
-            for part in root.findall(".//DIV6"):
+            # Parts are DIV5 TYPE="PART"; earlier code incorrectly iterated DIV6 (subparts)
+            for part in root.findall(".//DIV5[@TYPE='PART']"):
+                raw_part_num = part.get("N")  # attribute holds the numeric part identifier
+                part_head_text = self._safe_get_text(part, "./HEAD") or ""
+                # Fallback: extract part number from heading like "PART 10—..."
+                if not raw_part_num and part_head_text:
+                    m_part = re.search(r"PART\s+([0-9A-Za-z]+)", part_head_text)
+                    raw_part_num = m_part.group(1) if m_part else None
                 pinfo = {
-                    "part_number": self._safe_get_text(part, "./N"),
-                    "part_name": self._safe_get_text(part, "./HEAD"),
+                    "part_number": raw_part_num,
+                    "part_name": part_head_text.strip() if part_head_text else None,
                     "sections": [],
                 }
-                for section in part.findall(".//DIV8"):
+                # Sections under a part may be nested within SUBPART (DIV6) containers. We collect DIV8 TYPE="SECTION" beneath this part only.
+                for section in part.findall(".//DIV8[@TYPE='SECTION']"):
                     section_text = ET.tostring(section, encoding="unicode", method="text").strip()
+                    raw_sec_num = section.get("N")  # attribute like "§ 10.1"
+                    if raw_sec_num:
+                        # Normalize to bare number without leading symbol § and surrounding spaces
+                        m_num = re.search(r"§\s*([0-9][0-9A-Za-z.\-]*)", raw_sec_num)
+                        norm_sec_num = m_num.group(1) if m_num else raw_sec_num.strip()
+                    else:
+                        # Fallback parse from HEAD if attribute missing
+                        head_txt = self._safe_get_text(section, "./HEAD") or ""
+                        m_head = re.match(r"§\s*([0-9][0-9A-Za-z.\-]*)", head_txt)
+                        norm_sec_num = m_head.group(1) if m_head else None
                     sinfo = {
-                        "section_number": self._safe_get_text(section, "./N"),
+                        "section_number": norm_sec_num,
                         "section_name": self._safe_get_text(section, "./HEAD"),
                         "content": section_text,
                         "word_count": len(re.findall(r"\b\w+\b", section_text)),
