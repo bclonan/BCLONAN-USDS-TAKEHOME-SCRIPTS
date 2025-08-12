@@ -1,220 +1,255 @@
 # ECFR Scraper
 
-High‑level utility to download, parse, and analyze eCFR (Electronic Code of Federal Regulations) XML titles (1–50) from `govinfo.gov`. Provides checksum-based caching, parallel downloads, structured JSON export, lexical statistics, per-file metadata, and notebooks for exploration. (Former upload/storage features removed.)
+Download, parse, normalize, index, embed, and analyze eCFR XML titles (1–50).
 
+Features:
+
+* Incremental checksum downloads
+* Structured JSON export + lexical stats
+* Per‑section normalized artifacts (headings, paragraphs, citations)
+* Pluggable pipeline (`--chain step1,step2,...`)
+* Full‑text search (SQLite FTS5)
+* Section + paragraph embeddings (sentence-transformers)
+* FastAPI search + analyzer metrics API
+* Analyzer ingestion + primitive metrics (RRD, CCI, ERI, PBI, AMR placeholder, FLI, RSR placeholder)
+* Minification / gzip + artifact manifests
+
+---
 ## Quick Start
 
 ```powershell
-pip install -r requirements.txt          # install core deps
+pip install -r requirements.txt
 python -m ecfr_scraper --title 1 --output .\data --verbose
 ```
 
-> NOTE: Earlier versions supported upload & manifest generation; that functionality has been deprecated.
-
-## Feature Highlights
-
-- Title XML download with checksum skip (idempotent re-runs)
-- Parallel multi-title fetch (`--all`, `--workers N`)
-- XML → structured JSON (parts, sections, stats)
-- Lexical analysis: word & sentence counts, top words
-- Per-artifact metadata sidecar (`*.metadata.json`)
-<!-- Storage/manifest features removed -->
-- Logging (console + rotating log file) & progress bars (tqdm)
-
-## CLI Reference
-
-Run `python -m ecfr_scraper -h` or `ecfr-scraper --help` after install.
-
-Core options:
-
-- `--title N`                Download & process a single title
-- `--all`                    Download & process all titles (1–50)
-- `--output PATH`            Local output directory (default `./data`)
-- `--workers INT`            Parallel download threads (default 5)
-- `--metadata-only`          Skip XML parsing / JSON export (metadata only)
-- `--verbose`                Verbose logging
-
-Storage / publication:
-
-- `--storage-backend {folder,s3}`  Select backend (omit for noop)
-- `--storage-bucket VALUE`         Folder path (folder) or bucket name (s3)
-- `--storage-prefix PREFIX`        Subdirectory/object key prefix (default `ecfr`)
-- `--no-public`                    For S3: disable public-read ACL
-- `--upload`                       After download, upload each XML (and derived JSON/metadata when processed)
-- `--manifest FILE`                Write manifest JSON mapping titles to artifact paths
-
-Examples:
+### Common CLI Patterns
 
 ```powershell
-# All titles, parallel, produce manifest locally (no upload)
-python -m ecfr_scraper --all --workers 8 --manifest manifest.json
-
-# Single title, folder staging
-python -m ecfr_scraper --title 10 --upload --storage-backend folder --storage-bucket staged --manifest manifest.json
-
-# Single title, S3 (requires boto3 + credentials configured)
-pip install boto3
-python -m ecfr_scraper --title 5 --upload --storage-backend s3 --storage-bucket my-bucket --storage-prefix ecfr --manifest manifest.json
+# Single title
+python -m ecfr_scraper --title 7 --output .\data
+# All titles (5 workers)
+python -m ecfr_scraper --all --output .\data
+# Only download now, parse later
+python -m ecfr_scraper --all --download-only --output .\data
+# Parse previously downloaded
+python -m ecfr_scraper --parse-existing --output .\data
 ```
 
-## Programmatic API
+### Pipeline Steps
 
-```python
-from ecfr_scraper.scraper import ECFRScraper
-from ecfr_scraper.storage import build_storage
+Current steps:
+`download, diff, parse, export, minify, gzipxml, manifest, normalize, enrich, ftsindex, embed, embedparas, analyze_ingest, analyze_metrics, apiserve`
 
-storage = build_storage('folder', bucket='staged', prefix='ecfr')  # or 's3'
-scraper = ECFRScraper(output_dir='data', storage=storage)
-
-xml_path = scraper.download_title_xml(1, upload=True)
-data = scraper.parse_xml(xml_path)
-scraper.export_to_json(data, xml_path.replace('.xml', '.json'))
+```powershell
+# Download + parse
+python -m ecfr_scraper --title 3 --chain download,parse --output .\data
+# Full export for a title
+python -m ecfr_scraper --title 4 --chain download,parse,export,normalize --output .\data
 ```
 
-Key methods:
+---
+## Artifacts
 
-- `download_title_xml(title, output_dir=None, upload=False)`
-- `download_all_titles(output_dir=None, max_workers=5, upload=False)`
-- `parse_xml(path)` → structured dict
-- `export_to_json(data, path)`
-- `process_downloaded_files(file_paths)` batch parse + export
+Per title N:
 
-## Output Artifacts
-
-For each title `N`:
-
-- Raw XML: `data/titleN.xml`
-- Parsed JSON: `data/titleN.json`
-- Metadata: `data/titleN.xml.metadata.json`
-- (Optional) Staged copy or S3 object if `--upload` used
+* Raw XML `data/titleN.xml`
+* Parsed JSON `data/titleN.json`
+* Metadata `data/titleN.xml.metadata.json`
+* Normalized sections `data/sections/titleN/*.json`
 
 Global:
 
-- `checksums.json` — Persistent SHA‑256 map for incremental updates
-- `ecfr_scraper.log` — Log file
-- `manifest.json` (optional) — Summary of artifact locations
+* `checksums.json` – SHA-256 map
+* `ecfr_index.sqlite` – FTS index (after `ftsindex`)
+* `analyzer.sqlite` – Analyzer DB (after analyzer steps)
+* `artifacts.json` – Manifest of artifacts + checksums
+* `ecfr_scraper.log`
 
-### Manifest Format
-
-Example (folder backend):
-
-```json
-{
-  "title1": {
-    "xml": "data/title1.xml",
-    "json": "data/title1.json",
-    "metadata": "data/title1.xml.metadata.json"
-  }
-}
-```
-
-If S3 + public, values can be HTTPS URLs; otherwise `s3://bucket/key` style.
-
-## Architecture Overview
-
-```text
-          +--------------------+
-          |  CLI (argparse)    |
-          +----------+---------+
-                     |
-                     v
-        +------------+-------------+
-        |  ECFRScraper (core)      |
-        |  - download_title_xml    |
-        |  - download_all_titles   |
-        |  - parse_xml             |
-        +------------+-------------+
-                     |
-        +------------+-------------+
-        |  MetadataExtractor       |
-        +------------+-------------+
-                     |
-        +------------+-------------+
-        |  Storage Backend         |
-        | (Noop | Folder | S3)     |
-        +------------+-------------+
-                     |
-        +------------+-------------+
-        |  Outputs / Manifest      |
-        +--------------------------+
-```
-
-### Components & Responsibilities
-
-- `ECFRScraper` — Orchestrates download, checksum validation, parsing, lexical analysis, storage upload hooks.
-- `MetadataExtractor` — File-level metadata (size, mtime, hash, format heuristics) with pluggable extractors per extension.
-- `utils` — Logging setup, checksum helpers, load/save checksum DB.
-- `storage` — Strategy abstraction (`StorageBackend` protocol) with `NoopStorage`, `FolderStorage`, `S3Storage` + factory `build_storage`.
-- `cli` — User-facing argument parsing, high-level workflow (download, process, upload, manifest assembly).
-- Notebooks (`notebooks/`) — Guided usage (CLI, API, metadata, utilities, tutorial).
-
-### Data Flow
-
-1. CLI parses arguments → constructs storage backend + `ECFRScraper`.
-2. For each title: check checksum; skip or download.
-3. On fresh download: write XML, compute & persist checksum; extract metadata sidecar.
-4. If parsing enabled: parse XML → structured dict → JSON export + lexical stats.
-5. If `--upload`: each new artifact passed to storage backend.
-6. Manifest (if requested) accumulates artifact references.
-
-### Key Design Decisions
-
-- **Checksum Cache**: Avoid redundant network / parsing to speed iterative runs.
-- **Threaded Downloads**: Simple `ThreadPoolExecutor` suffices (I/O bound); avoids heavier async complexity.
-- **Sidecar Metadata**: Keeps original XML untouched while enabling quick file introspection & reproducibility metadata.
-- **Scope Simplification**: Removed prior storage/upload features to keep focus on reliable acquisition & parsing.
-
-### Extension Points
-
-- Add new storage: implement `upload(local_path, remote_path=None)` and wire into `build_storage`.
-- Add richer parsing (citations, cross-references) inside `parse_xml`.
-- Enhance metadata: extend `MetadataExtractor.extract_*` methods.
-- Introduce retries/backoff or rate limiting in download logic.
-- Add testing: unit tests for parsing, checksum skipping, storage strategies.
-
-## Notebooks
-
-Located in `notebooks/`:
-
-- Tutorial (end-to-end)
-- CLI Usage
-- API Usage
-- Metadata Utilities
-- Utils (checksums & logging)
-
-Open in VS Code or Jupyter Lab to experiment.
-
-## Development & Contributing
-
-Editable install:
+---
+## Full Pipeline Example
 
 ```powershell
-pip install -e .
+# Full (analyzer after embeddings)
+python -m ecfr_scraper --all --chain download,diff,parse,export,normalize,enrich,ftsindex,embed,embedparas,minify,gzipxml,analyze_ingest,analyze_metrics,manifest --output .\data
 ```
-Run a smoke test:
+
+Performs:
+
+1. Download changed titles
+2. Parse & export JSON
+3. Normalize per‑section artifacts
+4. Enrich for indexing
+5. Build FTS index
+6. Section + paragraph embeddings
+7. Analyzer ingestion & metrics
+8. Minify & gzip XML
+9. Write manifests
+
+Minimal (no embeddings/analyzer):
+
+```powershell
+python -m ecfr_scraper --all --chain download,diff,parse,export,normalize,minify,gzipxml,manifest --output .\data
+```
+
+Force full reprocess (ignore diff):
+
+```powershell
+python -m ecfr_scraper --all --chain download,parse,export,normalize,enrich,ftsindex --output .\data
+```
+Or delete the checksum DB:
+
+```powershell
+Remove-Item .\data\checksums.json
+```
+
+---
+## API Server
+
+After building index (and optionally analyzer DB):
+
+```powershell
+python -m ecfr_scraper --title 1 --chain download,parse,export,normalize,enrich,ftsindex,analyze_ingest,analyze_metrics,apiserve --output .\data
+```
+Endpoints:
+
+* `/health`
+* `/search?q=term`
+* `/titles`
+* `/section/{rowid}`
+* `/analyzer/metrics/section/{rowid}?db=data/analyzer.sqlite`
+* `/analyzer/metrics/summary/title/{title}?db=data/analyzer.sqlite`
+
+---
+## Optional Dependency Groups
+
+```powershell
+pip install .[api]       # FastAPI server
+pip install .[embed]     # Section + paragraph embeddings
+pip install .[analyzer]  # Analyzer ingestion + metrics
+pip install .[dev]       # Tests
+# Combine
+pip install .[api,embed,analyzer,dev]
+```
+
+---
+## Primitive Metrics (Initial Analyzer Set)
+
+| Code | Description |
+|------|-------------|
+| RRD  | Redundancy density heuristic |
+| CCI  | CFR citation density per 1k words |
+| ERI  | External reference density per 1k words |
+| PBI  | Paragraphs per 1k words |
+| AMR  | Amendment ratio (placeholder 0) |
+| FLI  | Fragmentation (paragraphs / log2(words)) |
+| RSR  | Revision stability (placeholder 1) |
+
+Future additions: duplication detection, graph centrality, volatility, composite scores.
+
+---
+## Validation & Minification
+
+Scripts:
+
+* `scripts/validate_xml.py` – structural / textual anomaly scan → JSON report
+* `scripts/minify_ecfr_xml.py` – whitespace/comment stripping (conservative or aggressive)
+
+Example:
+
+```powershell
+python scripts/validate_xml.py "data/title*.xml" > validation_report.json
+python scripts/minify_ecfr_xml.py data --aggressive --drop-empty
+```
+
+Minimal artifact commit chain:
+
+```powershell
+python -m ecfr_scraper --all --chain download,diff,parse,export,normalize,minify,gzipxml,manifest --output .\data
+```
+
+---
+## Development
+
+Editable install & tests:
+
+```powershell
+pip install -e .[dev]
+pytest -q
+```
+Smoke test:
 
 ```powershell
 python -m ecfr_scraper --title 1 --output .\data --metadata-only --verbose
 ```
-Format / lint (add your preferred tools; none enforced yet).
 
+Add a pipeline step:
+ 
+### Embedding Performance Tuning
 
+Environment variables (optional):
+
+* `ECFR_EMBED_MODEL` – Override model name (default `all-MiniLM-L6-v2`).
+* `ECFR_EMBED_LIMIT` – Limit number of sections embedded (e.g. `500` for a quick run).
+* `ECFR_EMBED_BATCH` – Batch size (default 32).
+* `ECFR_EMBEDPARA_LIMIT` – Limit paragraph embeddings count.
+
+Example (PowerShell):
+
+```powershell
+$env:ECFR_EMBED_LIMIT=500
+python -m ecfr_scraper --title 1 --chain download,parse,export,normalize,enrich,ftsindex,embed --output .\data
+Remove-Item Env:ECFR_EMBED_LIMIT
+```
+
+### API Testing
+
+Unit tests now cover core search endpoints via FastAPI's TestClient (`tests/test_api_search.py`). Run all tests with:
+
+```powershell
+pytest -q
+```
+
+1. Edit `ecfr_scraper/pipeline.py`
+2. Define `@pipeline_step() def stepname(ctx): ...`
+3. Run with `--chain existing,stepname`
+
+---
 ## Troubleshooting
 
-- Stale data? Delete `checksums.json` to force re-download.
-- Large runs slow? Increase `--workers`, or restrict to needed titles.
+* All titles skipped: remove `checksums.json` or omit `diff`.
+* Missing analyzer endpoints: run `analyze_ingest,analyze_metrics` & install analyzer extra.
+* Missing embeddings: install `.[embed]` and include `embed` (and `embedparas`) after `ftsindex`.
+* Large runtime: subset `--title` or omit heavy steps during iteration.
 
-## Roadmap (Ideas)
+---
+---
+## Fresh Rebuild / Cleanup
 
-- Incremental diff export (changed sections only)
-- Structured citation graph
-- Optional SQLite catalog of parsed sections
+Sometimes you want to guarantee you're using only freshly generated artifacts (e.g. after code changes to parsing, normalization, or metrics). Either call the cleanup script below or run the manual PowerShell commands.
 
-## Utilizing this repository
+Script (recommended):
 
-You can use the data downloaded and parsed by the ECFR Scraper in various ways, such as:
+```powershell
+python scripts/cleanup_artifacts.py --output .\data --reset
+```
 
-- Analyzing the JSON output for specific regulatory text or metadata.
-- Integrating the data into other applications or workflows.
-- Using the metadata for compliance tracking or reporting.
-- Visualizing the data for insights or presentations.
+Manual (selective):
+
+```powershell
+# Remove checksum DB so all titles are treated as changed
+Remove-Item .\data\checksums.json -ErrorAction SilentlyContinue
+# Remove indexes & analyzer DB
+Remove-Item .\data\ecfr_index.sqlite -ErrorAction SilentlyContinue
+Remove-Item .\data\analyzer.sqlite -ErrorAction SilentlyContinue
+# Remove section artifacts & manifests
+Remove-Item -Recurse -Force .\data\sections -ErrorAction SilentlyContinue
+Remove-Item .\data\artifacts.json -ErrorAction SilentlyContinue
+Remove-Item .\data\manifest.json -ErrorAction SilentlyContinue
+# (Optional) remove derived minified/gzip files
+Remove-Item .\data\*.min.xml -ErrorAction SilentlyContinue
+Remove-Item .\data\*.xml.gz -ErrorAction SilentlyContinue
+```
+
+Then re-run the desired pipeline chain (include normalize/analyzer steps if needed).
+
+

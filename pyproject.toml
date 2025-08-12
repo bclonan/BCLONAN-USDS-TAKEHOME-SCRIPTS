@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ecfr-scraper"
-version = "0.1.0"
-description = "Download and parse eCFR XML with metadata and checksums"
+version = "0.2.0"
+description = "Download, parse & index eCFR XML (pipeline + optional API/embedding)"
 readme = "README.md"
 requires-python = ">=3.9"
 authors = [{ name = "BCLONAN" }]
@@ -13,6 +13,27 @@ license = { text = "Proprietary" }
 dependencies = [
   "requests>=2.31.0",
   "tqdm>=4.66.0",
+]
+
+[project.optional-dependencies]
+# Install with: pip install .[api]
+api = [
+  "fastapi>=0.110.0",
+  "uvicorn[standard]>=0.29.0",
+]
+# Install with: pip install .[embed]
+embed = [
+  "sentence-transformers>=2.6.0",
+]
+# Install with: pip install .[analyzer]
+analyzer = [
+  "fastapi>=0.110.0",
+  "uvicorn[standard]>=0.29.0",
+  "lxml>=4.9.0",
+]
+# Development / testing helpers
+dev = [
+  "pytest>=7.4.0",
 ]
 
 [project.scripts]

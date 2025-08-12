@@ -3,10 +3,28 @@ import re
 import json
 import logging
 from collections import Counter
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
+"""Core scraper logic: download ECFR titles, parse XML, export JSON & metadata.
+
+This module provides ECFRScraper with:
+  * resilient HTTP session (retries)
+  * checksum tracking to skip unchanged downloads
+  * concurrent bulk download with progress (tqdm + as_completed)
+  * XML parsing + lightweight lexical stats
+  * metadata extraction for each downloaded XML
+"""
+
+import os
+import re
+import json
+import logging
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional, List
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import xml.etree.ElementTree as ET
 from tqdm import tqdm
 
@@ -17,145 +35,176 @@ logger = logging.getLogger(__name__)
 
 
 class ECFRScraper:
-    """Enhanced scraper for ECFR data: download, parse, analyze, extract metadata."""
+    """Download, parse, and export ECFR titles with retry + checksum support."""
 
     def __init__(
         self,
         base_url: str = "https://www.govinfo.gov/bulkdata/ECFR",
         output_dir: str = "./data",
-    ):
-        self.base_url = base_url
+    ) -> None:
+        self.base_url = base_url.rstrip("/")
         self.output_dir = output_dir
-        self.session = requests.Session()
+        self.session: Optional[requests.Session] = None
         self.checksum_db = load_checksum_db()
         self.metadata_extractor = MetadataExtractor()
-        os.makedirs(output_dir, exist_ok=True)
+        os.makedirs(self.output_dir, exist_ok=True)
 
-    def get_resource_file(self, resource_name: str):
-        """Download a resource file with checksum verification and metadata extraction"""
-        resource_url = f"{self.base_url}/{resource_name}"
-        resource_path = os.path.join(self.output_dir, resource_name)
+    # ------------------------------------------------------------------
+    # Networking / Download
+    # ------------------------------------------------------------------
+    def _configure_session(self) -> None:
+        if self.session is not None:
+            return
+        session = requests.Session()
+        retry = Retry(
+            total=5,
+            backoff_factor=0.5,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET"],
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+        self.session = session
 
-        if os.path.exists(resource_path):
-            existing_checksum = calculate_checksum(file_path=resource_path)
-            if existing_checksum == self.checksum_db.get(resource_name):
-                logger.info(f"Resource {resource_name} unchanged. Skipping download.")
-                return resource_path
-
-        try:
-            logger.info(f"Downloading resource {resource_name} from {resource_url}")
-            response = self.session.get(resource_url)
-            response.raise_for_status()
-
-            with open(resource_path, "wb") as f:
-                f.write(response.content)
-
-            new_checksum = calculate_checksum(file_path=resource_path)
-            self.checksum_db[resource_name] = new_checksum
-
-            metadata = self.metadata_extractor.extract(resource_path)
-            metadata_path = f"{resource_path}.metadata.json"
-            with open(metadata_path, "w", encoding="utf-8") as f:
-                json.dump(metadata, f, indent=2)
-
-            logger.info(f"Downloaded and saved: {resource_path}")
-            return resource_path
-        except requests.RequestException as e:
-            logger.error(f"Failed to download resource {resource_name}: {e}")
-            return None
-
-    def get_available_titles(self):
+    def get_available_titles(self) -> List[int]:
         return list(range(1, 51))
 
-    def download_title_xml(self, title_number: int, output_dir: Optional[str] = None):
+    def download_title_xml(self, title_number: int, output_dir: Optional[str] = None) -> Optional[str]:
         if output_dir is None:
             output_dir = self.output_dir
-
         os.makedirs(output_dir, exist_ok=True)
+        filename = f"title{title_number}.xml"
+        path = os.path.join(output_dir, filename)
         url = f"{self.base_url}/title-{title_number}/ECFR-title{title_number}.xml"
-        output_path = os.path.join(output_dir, f"title{title_number}.xml")
 
-        if os.path.exists(output_path):
-            existing_checksum = calculate_checksum(file_path=output_path)
-            if existing_checksum == self.checksum_db.get(f"title{title_number}.xml"):
-                logger.info(f"Title {title_number} unchanged. Skipping download.")
-                return output_path
+        if os.path.exists(path):
+            existing = calculate_checksum(file_path=path)
+            if existing == self.checksum_db.get(filename):
+                logger.info("Title %s unchanged. Skipping download.", title_number)
+                return path
 
-        max_title = 50
-        current_title = title_number
+        try:
+            self._configure_session()
+            logger.info("Downloading title %s", title_number)
+            resp = self.session.get(url, timeout=60)  # type: ignore[arg-type]
+            resp.raise_for_status()
+            with open(path, "wb") as f:
+                f.write(resp.content)
+            self.checksum_db[filename] = calculate_checksum(file_path=path)
+            metadata = self.metadata_extractor.extract(path)
+            with open(f"{path}.metadata.json", "w", encoding="utf-8") as f:
+                json.dump(metadata, f, indent=2)
+            return path
+        except requests.RequestException as e:  # pragma: no cover - network
+            logger.warning("Failed to download title %s: %s", title_number, e)
+            return None
 
-        while current_title <= max_title:
-            try:
-                logger.info(f"Attempting to download title {current_title} from {url}")
-                response = self.session.get(url)
-                response.raise_for_status()
+    def download_all_titles(self, output_dir: Optional[str] = None, max_workers: int = 5) -> List[str]:
+        if output_dir is None:
+            output_dir = self.output_dir
+        titles = self.get_available_titles()
+        results: List[str] = []
+        failures: List[int] = []
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_map = {executor.submit(self.download_title_xml, t, output_dir): t for t in titles}
+            with tqdm(total=len(future_map), desc="Downloading Titles") as bar:
+                for fut in as_completed(future_map):
+                    t = future_map[fut]
+                    try:
+                        path = fut.result()
+                        if path:
+                            results.append(path)
+                        else:
+                            failures.append(t)
+                    except Exception as e:  # pragma: no cover
+                        logger.error("Unexpected error downloading title %s: %s", t, e)
+                        failures.append(t)
+                    bar.update(1)
+        save_checksum_db(self.checksum_db)
+        if failures:
+            logger.warning("Failed titles: %s", failures)
+        logger.info("Downloaded %s/%s titles", len(results), len(titles))
+        return results
 
-                with open(output_path, "wb") as f:
-                    f.write(response.content)
+    def get_resource_file(self, resource_name: str) -> Optional[str]:
+        resource_url = f"{self.base_url}/{resource_name}"
+        path = os.path.join(self.output_dir, resource_name)
+        if os.path.exists(path):
+            if calculate_checksum(file_path=path) == self.checksum_db.get(resource_name):
+                logger.info("Resource %s unchanged. Skipping.", resource_name)
+                return path
+        try:
+            self._configure_session()
+            resp = self.session.get(resource_url, timeout=60)  # type: ignore[arg-type]
+            resp.raise_for_status()
+            with open(path, "wb") as f:
+                f.write(resp.content)
+            self.checksum_db[resource_name] = calculate_checksum(file_path=path)
+            metadata = self.metadata_extractor.extract(path)
+            with open(f"{path}.metadata.json", "w", encoding="utf-8") as f:
+                json.dump(metadata, f, indent=2)
+            return path
+        except requests.RequestException as e:  # pragma: no cover
+            logger.error("Failed resource download %s: %s", resource_name, e)
+            return None
 
-                new_checksum = calculate_checksum(file_path=output_path)
-                self.checksum_db[f"title{current_title}.xml"] = new_checksum
-
-                metadata = self.metadata_extractor.extract(output_path)
-                metadata_path = f"{output_path}.metadata.json"
-                with open(metadata_path, "w", encoding="utf-8") as f:
-                    json.dump(metadata, f, indent=2)
-
-                logger.info(f"Downloaded and saved: {output_path}")
-                return output_path
-            except requests.RequestException as e:
-                logger.warning(
-                    f"Title {current_title} not available. Trying next title. Error: {e}"
-                )
-                current_title += 1
-                url = f"{self.base_url}/title-{current_title}/ECFR-title{current_title}.xml"
-                output_path = os.path.join(output_dir, f"title{current_title}.xml")
-
-        logger.error(f"Failed to download any titles starting from {title_number}.")
-        return None
-
+    # ------------------------------------------------------------------
+    # Parsing / Export
+    # ------------------------------------------------------------------
     def parse_xml(self, xml_path: str):
         try:
             tree = ET.parse(xml_path)
             root = tree.getroot()
-
             title_info = {
                 "title_number": self._safe_get_text(root, ".//TITL"),
                 "title_name": self._safe_get_text(root, ".//HEAD"),
                 "parts": [],
                 "stats": {"total_sections": 0, "word_count": 0, "paragraph_count": 0},
             }
-
-            for part in root.findall(".//DIV6"):
-                part_info = {
-                    "part_number": self._safe_get_text(part, "./N"),
-                    "part_name": self._safe_get_text(part, "./HEAD"),
+            # Parts are DIV5 TYPE="PART"; earlier code incorrectly iterated DIV6 (subparts)
+            for part in root.findall(".//DIV5[@TYPE='PART']"):
+                raw_part_num = part.get("N")  # attribute holds the numeric part identifier
+                part_head_text = self._safe_get_text(part, "./HEAD") or ""
+                # Fallback: extract part number from heading like "PART 10—..."
+                if not raw_part_num and part_head_text:
+                    m_part = re.search(r"PART\s+([0-9A-Za-z]+)", part_head_text)
+                    raw_part_num = m_part.group(1) if m_part else None
+                pinfo = {
+                    "part_number": raw_part_num,
+                    "part_name": part_head_text.strip() if part_head_text else None,
                     "sections": [],
                 }
-
-                for section in part.findall(".//DIV8"):
+                # Sections under a part may be nested within SUBPART (DIV6) containers. We collect DIV8 TYPE="SECTION" beneath this part only.
+                for section in part.findall(".//DIV8[@TYPE='SECTION']"):
                     section_text = ET.tostring(section, encoding="unicode", method="text").strip()
-                    section_info = {
-                        "section_number": self._safe_get_text(section, "./N"),
+                    raw_sec_num = section.get("N")  # attribute like "§ 10.1"
+                    if raw_sec_num:
+                        # Normalize to bare number without leading symbol § and surrounding spaces
+                        m_num = re.search(r"§\s*([0-9][0-9A-Za-z.\-]*)", raw_sec_num)
+                        norm_sec_num = m_num.group(1) if m_num else raw_sec_num.strip()
+                    else:
+                        # Fallback parse from HEAD if attribute missing
+                        head_txt = self._safe_get_text(section, "./HEAD") or ""
+                        m_head = re.match(r"§\s*([0-9][0-9A-Za-z.\-]*)", head_txt)
+                        norm_sec_num = m_head.group(1) if m_head else None
+                    sinfo = {
+                        "section_number": norm_sec_num,
                         "section_name": self._safe_get_text(section, "./HEAD"),
                         "content": section_text,
                         "word_count": len(re.findall(r"\b\w+\b", section_text)),
                         "paragraph_count": len(section.findall(".//P")),
                     }
-                    part_info["sections"].append(section_info)
-
+                    pinfo["sections"].append(sinfo)
                     title_info["stats"]["total_sections"] += 1
-                    title_info["stats"]["word_count"] += section_info["word_count"]
-                    title_info["stats"]["paragraph_count"] += section_info["paragraph_count"]
-
-                title_info["parts"].append(part_info)
-
+                    title_info["stats"]["word_count"] += sinfo["word_count"]
+                    title_info["stats"]["paragraph_count"] += sinfo["paragraph_count"]
+                title_info["parts"].append(pinfo)
             all_text = "".join(root.itertext())
             title_info["lexical_analysis"] = self._perform_lexical_analysis(all_text)
-
             return title_info
-        except Exception as e:
-            logger.error(f"Error parsing {xml_path}: {e}")
+        except Exception as e:  # pragma: no cover
+            logger.error("Error parsing %s: %s", xml_path, e)
             return None
 
     def _safe_get_text(self, element, xpath):
@@ -167,14 +216,13 @@ class ECFRScraper:
         word_count = len(words)
         sentences = re.split(r"[.!?]+", text)
         sentence_count = len([s for s in sentences if s.strip()])
-
         return {
             "total_words": word_count,
             "unique_words": len(set(words)),
-            "avg_word_length": sum(len(word) for word in words) / word_count if word_count > 0 else 0,
+            "avg_word_length": sum(len(w) for w in words) / word_count if word_count else 0,
             "top_words": Counter(words).most_common(20),
             "sentence_count": sentence_count,
-            "avg_sentence_length": word_count / sentence_count if sentence_count > 0 else 0,
+            "avg_sentence_length": word_count / sentence_count if sentence_count else 0,
         }
 
     def export_to_json(self, data, output_path: str) -> bool:
@@ -182,76 +230,30 @@ class ECFRScraper:
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
-            logger.info(f"Exported to {output_path}")
+            logger.info("Exported %s", output_path)
             return True
-        except Exception as e:
-            logger.error(f"Error exporting to JSON: {e}")
+        except Exception as e:  # pragma: no cover
+            logger.error("JSON export failed for %s: %s", output_path, e)
             return False
 
-    def download_all_titles(
-        self,
-        output_dir: Optional[str] = None,
-        max_workers: int = 5,
-    ) -> List[str]:
-        if output_dir is None:
-            output_dir = self.output_dir
-
-        titles = self.get_available_titles()
-        downloaded_files: List[str] = []
-        failed_titles: List[int] = []
-
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(self.download_title_xml, title, output_dir): title for title in titles}
-
-            with tqdm(total=len(futures), desc="Downloading Titles") as progress_bar:
-                for future in futures:
-                    title = futures[future]
-                    try:
-                        result = future.result()
-                        if result:
-                            downloaded_files.append(result)
-                        else:
-                            failed_titles.append(title)
-                    except Exception as e:
-                        logger.error(f"Download error for title {title}: {e}")
-                        failed_titles.append(title)
-                    finally:
-                        progress_bar.update(1)
-
-        save_checksum_db(self.checksum_db)
-
-        logger.info(f"Downloaded {len(downloaded_files)} titles successfully")
-        if failed_titles:
-            logger.warning(f"Failed to download {len(failed_titles)} titles: {failed_titles}")
-
-        return downloaded_files
-
-
-    def process_downloaded_files(self, files):
+    # ------------------------------------------------------------------
+    # High-level processing
+    # ------------------------------------------------------------------
+    def process_downloaded_files(self, files: List[str]):
         results = []
-
-        for file_path in tqdm(files, desc="Processing Files"):
+        for path in tqdm(files, desc="Processing Files"):
             try:
-                data = self.parse_xml(file_path)
+                data = self.parse_xml(path)
                 if data:
-                    json_path = file_path.replace(".xml", ".json")
+                    json_path = path.replace(".xml", ".json")
                     self.export_to_json(data, json_path)
-
-                    metadata = self.metadata_extractor.extract(file_path)
-                    metadata_path = f"{file_path}.metadata.json"
-                    with open(metadata_path, "w", encoding="utf-8") as f:
+                    metadata = self.metadata_extractor.extract(path)
+                    with open(f"{path}.metadata.json", "w", encoding="utf-8") as f:
                         json.dump(metadata, f, indent=2)
-
-                    results.append({
-                        "file": file_path,
-                        "json": json_path,
-                        "metadata": metadata_path,
-                        "success": True,
-                    })
+                    results.append({"file": path, "json": json_path, "metadata": f"{path}.metadata.json", "success": True})
                 else:
-                    results.append({"file": file_path, "success": False, "error": "Failed to parse XML"})
-            except Exception as e:
-                logger.error(f"Error processing file {file_path}: {e}")
-                results.append({"file": file_path, "success": False, "error": str(e)})
-
+                    results.append({"file": path, "success": False, "error": "parse failed"})
+            except Exception as e:  # pragma: no cover
+                logger.error("Processing error %s: %s", path, e)
+                results.append({"file": path, "success": False, "error": str(e)})
         return results

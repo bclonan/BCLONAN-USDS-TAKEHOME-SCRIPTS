@@ -1,0 +1,54 @@
+name: Validate & Diff
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ecfr_scraper/**"
+      - "scripts/**"
+      - ".github/workflows/validate.yml"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: |
+          pip install -r requirements.txt
+          pip install lxml
+          pip install .[dev]
+      - name: Run scraper download (changed only path via diff step later)
+        run: |
+      - name: Run diff + parse/export on changed only
+        run: |
+          python -m ecfr_scraper --all --chain download,diff,parse,export --output data
+      - name: Validate XML
+        run: |
+          python scripts/validate_xml.py "data/title*.xml" > validation_report.json
+          echo 'Validation report generated.'
+      - name: Check validation errors
+        run: |
+          python - <<'PY'
+          import json,sys
+          with open('validation_report.json','r',encoding='utf-8') as f:
+              rep=json.load(f)
+          errors=[r for r in rep if r.get('errors')]
+          if errors:
+              print('Found validation errors:')
+              for r in errors:
+                  print(r['file'], r['errors'])
+              sys.exit(1)
+          print('No blocking validation errors.')
+          PY
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-report
+          path: validation_report.json
+      - name: Run tests
+        run: |
+          pytest -q
