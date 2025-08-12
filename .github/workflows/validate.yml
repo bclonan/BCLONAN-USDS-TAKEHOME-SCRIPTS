@@ -23,7 +23,6 @@ jobs:
           pip install .[dev]
       - name: Run scraper download (changed only path via diff step later)
         run: |
-          python -m ecfr_scraper --all --chain download --output data
       - name: Run diff + parse/export on changed only
         run: |
           python -m ecfr_scraper --all --chain download,diff,parse,export --output data
