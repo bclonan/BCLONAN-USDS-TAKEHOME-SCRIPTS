@@ -17,3 +17,12 @@ data/title*.xml
 !data/title*.min.xml
 !data/title*.xml.gz
 !data/manifest.json
+
+*.zip
+
+# Ignore all log files
+*.log
+
+# Ignore all zip files
+*.zip
+
